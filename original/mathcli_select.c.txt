@@ -1,0 +1,100 @@
+#include "unetprog.h"
+
+///////////////////////////////////////////////////////////////////////////////////////////////
+// MATH CLIENT USING I/O MULTIPLEXING, made by NOOR ULLAH (Electrical Engineering Department)//
+//////////////////////////////////////////////////////////////////////////////////////////////
+
+int main(int argc, char *argv[])
+{
+	int clifd;		// declaring variables
+	sockaddr_in srvaddr;
+
+	int stdinfd, maxfdp1;
+	fd_set rset, allset;	// declaring custom type variables of type fd_set for select function
+
+
+	int n, buflen;
+	char buf[MAXBUF], buf2[MAXBUF];		// char arrays buf1, buf2 for data storage
+
+	if(argc != 3)				// checking command line arguements and program opening
+		err_quit("usage: <progname> <address> <port>");	// error showing wrong CL arguements at run
+
+
+	if((clifd=socket(AF_INET, SOCK_STREAM, 0)) < 0)	// socket fxn called and its value is stored in clifd and checked for error
+		err_sys("socket error");
+
+	//socket addressing and specification etc
+	memset(&srvaddr, 0, sizeof(srvaddr));
+	srvaddr.sin_family = AF_INET;
+	srvaddr.sin_port = htons(atoi(argv[2]));
+	inet_pton(AF_INET, argv[1], &srvaddr.sin_addr);
+
+
+//////////////////////////////// COMMENT BELOW ////////////////////////////////////////////////////
+// connect is called to establish connection and also checked for errors
+
+	if(connect(clifd, (sockaddr *) &srvaddr, sizeof(srvaddr)) < 0)
+		err_sys("connect error");
+
+
+//////////////////////////////// COMMENT BELOW ////////////////////////////////////////////////////
+// fileno() is called which returns int value of descriptor for standard input here keyboard & its value is assgined to stdinfd
+
+	stdinfd = fileno(stdin);	
+	maxfdp1 = max(clifd, stdinfd) + 1;	// checking highest b/w clifd & stdinfd & the highest + 1 is assigned to maxfdp1
+
+	FD_ZERO(&allset);			// bitwise array "allset" is set to all zero
+	FD_SET(clifd, &allset);			// clifd is set to 1 in allset
+	FD_SET(stdinfd, &allset);		// stdinfd is set to 1 in allset
+
+	printf("\n\t\tWelcome to the NOOR Math Client/Server Program\n\nPlease enter the data in format:\tnum1+num2\n\n");
+		
+	while(1)
+	{
+		rset = allset;			// rset is assigned the values of allset
+
+
+//////////////////////////////// COMMENT BELOW ////////////////////////////////////////////////////
+//selec() is called using rset for reading and maxfdp1 as its highest list number i.e highest decriptor+1
+// and checked for errors by using if ((select())< 0)	
+
+		if(select(maxfdp1, &rset, NULL, NULL, NULL) < 0)
+			err_sys("select error");
+
+		if(FD_ISSET(stdinfd, &rset))	// To check if the stdinfd is 1 or not in rset? & if set then proceed keeping check on input from keyboard
+		{
+				scanf("%s",buf);	// taking input from keyboard and storing as string in buf
+
+
+//////////////////////////////// COMMENT BELOW ////////////////////////////////////////////////////
+// send() is called & data in buf is sent to the server. Also checked for errors
+
+				if((n=send(clifd, buf, sizeof(buf), 0)) < 0)
+					err_sys("send error");
+
+				FD_CLR(stdinfd, &allset);	// clear stdinfd in allset			
+				
+		}
+
+		if(FD_ISSET(clifd, &rset))	// To check if the clifd is 1 or not? & if set then proceed
+		{
+
+
+/////////////////////////////// COMMENT BELOW ///////////////////////////////////////////////////////
+// recv() is called and answer receveied from server is stored in buf2[]. Also value returned from recv is stored in n and checked if less than 1 then receive error otherwise proceed
+
+			if((n=recv(clifd, buf2, sizeof(buf2), 0)) < 0)
+				err_sys("recv error");
+
+			printf("%s\n", buf2);	// using printf to print result (string) stored in buf2
+
+					break;	// getting out of the loop
+
+
+		}
+
+			
+	}
+
+	return 0;
+}

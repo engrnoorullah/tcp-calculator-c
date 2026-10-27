@@ -1,0 +1,158 @@
+#include "unetprog.h"
+
+///////////////////////////////////////////////////////////////////////////////////////////////
+// MATH SERVER USING I/O MULTIPLEXING, made by NOOR ULLAH (Electrical Engineering Department)//
+//////////////////////////////////////////////////////////////////////////////////////////////
+
+int main(int argc, char *argv[])
+{
+	int listenfd, clifd;		// declaring variables
+	sockaddr_in srvaddr;
+
+	int i, maxi, nready, clients[FD_SETSIZE];	// variables and clients[] array for use
+	int maxfd;
+	fd_set rset, allset;		// declaring custom type variables of type fd_set for select function
+
+	int n, buflen,num1,num2,result;
+	char op;
+	char buf[MAXBUF],buf2[MAXBUF];		// char array buf,buf2 for data storage
+
+	if(argc != 2)					// checking command line arguements and program opening
+		err_quit("usage: <progname> <port>");	// error showing wrong CL arguements at run
+
+
+	if((listenfd=socket(AF_INET, SOCK_STREAM, 0)) < 0)	// socket() fxn called and its value is stored in listenfd and checked for error
+		err_sys("socket error");
+
+	//socket addressing and specification etc
+	memset(&srvaddr, 0, sizeof(srvaddr));
+	srvaddr.sin_family = AF_INET;
+	srvaddr.sin_port = htons(atoi(argv[1]));
+	srvaddr.sin_addr.s_addr = htonl(INADDR_ANY);
+
+	if(bind(listenfd, (sockaddr *) &srvaddr, sizeof(srvaddr)) < 0)	// bind() called and checked for errors
+		err_sys("bind error");
+	
+	if(listen(listenfd, LISTENQ) < 0)	// listen() called and checked for errors
+		err_sys("listen error");
+
+
+	FD_ZERO(&allset);			// bitwise array "allset" is set to all zero
+	FD_SET(listenfd, &allset);		// listenfd is set to 1 in allset
+	maxfd = listenfd;			// maxfd is assignment the value of listenfd
+	maxi = -1;
+
+	for(i=0; i<FD_SETSIZE; i++)		// clients[] array is set to -1 initially
+		clients[i] = -1;
+		
+	while(1)	// accept connections forever
+	{
+		rset = allset;			// rset is assigned the values of allset
+
+
+//////////////////////////////// COMMENT BELOW ////////////////////////////////////////////////////
+//selec() is called using rset for reading and maxfd+1 as its highest list number i.e highest decriptor+1
+// and checked for errors which is judged by the value returned by select stored in nready
+
+		if(nready=select(maxfd+1, &rset, NULL, NULL, NULL) < 0)
+			err_sys("select error");
+
+		if(FD_ISSET(listenfd, &rset))	// To check if the listenfd is 1 or not? & if set the proceed
+		{
+
+
+//////////////////////////////// COMMENT BELOW ////////////////////////////////////////////////////
+//accept() is called and its value returned is stored in clifd and is also checked for errors
+
+			if((clifd=accept(listenfd, (sockaddr *) NULL, NULL)) < 0)
+				err_sys("accept error");			
+
+
+//////////////////////////////// COMMENT BELOW ////////////////////////////////////////////////////
+//clients[i] is monitored and if -ive then get out of loop otherwise if i>maximum limit then forced shutdown
+
+			for(i=0; i<FD_SETSIZE; i++)
+				if(clients[i] < 0)	break;
+
+			if(i>=FD_SETSIZE)
+				shutdown(clifd, SHUT_RDWR);
+			else
+			{
+				clients[i] = clifd;	// clifd or new clients addrss is stored in clients[i]
+				FD_SET(clifd, &allset);		// clifd is set to 1 in allset
+
+				if(clifd > maxfd)
+					maxfd = clifd;
+
+				if(i > maxi)			// keeping record of number of clients
+					maxi = i;
+			}
+
+			if(--nready <= 0)	//nready is decremented and checked if its <=0 then go back and again repeat the process above
+				continue;
+		}
+
+		for(i=0; i<=maxi; i++)
+		{
+			if((clifd=clients[i]) < 0)	// value of clients[i] is assignened to clifd and checked if less than 0 then repeat means don't proceed but check for next i
+				continue;
+
+			if(FD_ISSET(clifd, &rset))	// clifd is checked whether set to 1 or not in rset if yes then proceed
+			{
+
+
+/////////////////////////////// COMMENT BELOW ///////////////////////////////////////////////////////
+// recv() is called and data receveied from client is stored in buf. Also value returned from recv is stored in n and checked if less than 1 then receive error otherwise proceed
+
+			if((n=recv(clifd,buf,sizeof(buf),0))<0)
+			{
+				err_sys("recv error");
+				exit(1);
+			}
+
+			sscanf(buf,"%d%c%d", &num1,&op,&num2);	// using sscanf() to get values from buf and store in num1,op and num2
+			
+
+			switch(op)					// switch statement is used for math operation and checked for operand stored in type of recv_data
+			{
+				case '+':					// result in case of addition
+					result = num1 + num2;
+					break;
+
+				case '-':					// result in case of subtraction
+					result = num1 - num2;
+					break;
+
+				case '*':					// result in case of multiplication
+					result = num1 * num2;
+					break;
+
+				case '/':					// result in case of division and checking to avoid indefinite condition
+					result = (num2==0 ? 0 : num1/num2);
+					break;
+						
+			}
+
+			sprintf(buf2,"%d",result);		// using sprint() to convert result into string and store in buf2
+
+
+
+//////////////////////////////// COMMENT BELOW ////////////////////////////////////////////////////
+// send() is called and result stored in buf2 is sent to the client. Also checked for errors
+
+					if((n=send(clifd, buf2, sizeof(buf2), 0)) < 0)
+						err_sys("send error");
+
+					close(clifd);		// clifd or connection closed
+					clients[i] = -1;	// current spot in client array is set to -1 so that it is availabe for next use
+					FD_CLR(clifd, &allset);	// clear clifd in allset
+
+
+				if(--nready <= 0)	// nready is decremented and if its <0 or =0 then get out of the loop back to accept
+					break;	
+				}
+			}
+		}	
+
+	return 0;
+}

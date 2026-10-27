@@ -1,0 +1,100 @@
+#include "unetprog.h"
+
+/////////////////////////////////////////////////////////////////////////
+// MATH SERVER, made by NOOR ULLAH (Electrical Engineering Department)//
+////////////////////////////////////////////////////////////////////////
+
+int main(int argc, char *argv[])
+{
+	int listenfd, clifd;			// declaring listenfd and clifd
+	sockaddr_in srvaddr, cliaddr;		// declaring srvaddress and client addresses
+	int cliaddrlen = sizeof(cliaddr);	// specifying client addres length
+
+	char buf[MAXLINE], buf2[MAXLINE],op;	// creating buffer for use in sending and receiving
+	int n, buflen;				// more variables for use
+
+	int num1, num2, result;			// declare variables num1, num2 to be operated and result
+
+
+	if(argc != 2)				// Checking command line arguments
+	{
+		printf("Example Usage: mathsrv1 <port>");	// showing error in opening program
+		exit(1);
+	}
+
+	if((listenfd = socket(AF_INET, SOCK_STREAM, 0)) < 0)	// creating a listening socket
+	{
+		printf("socket error: %s", strerror(errno));	// error showing
+		exit(1);
+	}
+	
+	memset(&srvaddr, 0, sizeof(srvaddr));	// binding the listenfd to a specified port and address
+	srvaddr.sin_family = AF_INET;
+	srvaddr.sin_port = htons(atoi(argv[1]));
+	srvaddr.sin_addr.s_addr = htonl(INADDR_ANY);
+	if(bind(listenfd, (sockaddr *) &srvaddr, sizeof(srvaddr)) < 0) // monitoring bind error
+	{
+		printf("bind error: %s", strerror(errno));
+		exit(1);
+	}
+
+	if(listen(listenfd, LISTENQ) < 0)	// Listen called and also monitored for error
+	{
+		printf("listen error: %s", strerror(errno));
+		exit(1);
+	}
+	
+	
+	while(1)	// run forever
+	{
+		// calling accept and accepting the client and checked for error
+		if((clifd = accept(listenfd, (sockaddr *) &cliaddr, &cliaddrlen)) < 0)
+		{
+			printf("accept error: %s", strerror(errno));
+			exit(1);
+		}
+
+			if((n=recv(clifd,buf,sizeof(buf),0))<0)	//recv() is called and data from client is received and stored in buf & checked for errors
+			{
+				err_sys("recv error");
+				exit(1);
+			}
+
+			sscanf(buf,"%d%c%d", &num1,&op,&num2);	// using sscanf() to get values from buf and store in num1,op and num2
+			
+
+			switch(op)					// switch statement is used for math operation and checked for operand stored in type of recv_data
+			{
+				case '+':					// result in case of addition
+					result = num1 + num2;
+					break;
+
+				case '-':					// result in case of subtraction
+					result = num1 - num2;
+					break;
+
+				case '*':					// result in case of multiplication
+					result = num1 * num2;
+					break;
+
+				case '/':					// result in case of division and checking to avoid indefinite condition
+					result = (num2==0 ? 0 : num1/num2);
+					break;
+						
+			}
+
+			sprintf(buf2,"%d",result);		// using sprint() to convert result into string and store in buf2
+
+
+			if((n=send(clifd,buf2,sizeof(buf2),0))<0)	// send() is called and answer is sent to client in form of string through buf2 and also checked for errors
+			{
+				err_sys("send error");
+				exit(1);
+			}
+
+
+		close(clifd);					// closing connection
+	}
+
+	return 1;
+}

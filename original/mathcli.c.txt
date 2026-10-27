@@ -1,0 +1,71 @@
+#include "unetprog.h"
+
+/////////////////////////////////////////////////////////////////////////
+// MATH CLIENT, made by NOOR ULLAH (Electrical Engineering Department)//
+////////////////////////////////////////////////////////////////////////
+
+int main(int argc, char *argv[])
+{
+	int clifd;			// declaring clifd
+	sockaddr_in srvaddr;		// declaring srvaddress addresse
+
+
+	char buf[MAXLINE];		// creating buffer for use in receiving
+	int buflen, n,result;			// more variables for use
+
+	if(argc != 3)			// Checking command line arguments
+	{
+		printf("Example Usage: mathsrv1 <ipaddress> <port>");
+		exit(1);
+	}
+
+	
+	if((clifd = socket(AF_INET, SOCK_STREAM, 0)) < 0)	// creating a socket and monitoring for error
+	{
+		printf("socket error: %s", strerror(errno));
+		exit(1);
+	}
+	
+	memset(&srvaddr, 0, sizeof(srvaddr));	// connecting to the server
+	srvaddr.sin_family = AF_INET;
+	srvaddr.sin_port = htons(atoi(argv[2]));
+	inet_pton(AF_INET, argv[1], &srvaddr.sin_addr);
+	if(connect(clifd, (sockaddr *) &srvaddr, sizeof(srvaddr)) < 0)	// connect called & checked for errors
+	{
+		printf("connect error: %s", strerror(errno));
+		exit(1);
+	}
+
+	
+
+	printf("\n\t\tWelcome to the NOOR Math Client/Server Program\n\nPlease enter the data in format:\tnum1+num2\n\n");
+	// displaying how to give input
+	
+
+	scanf("%s",buf);			// taking input from user and store as string in buf
+
+	if((n=send(clifd,buf,sizeof(buf),0))<0)	// send() is called and data is sent to server. Also checked for error
+	{	
+		err_sys("send error");
+		exit(1);
+	}
+	
+
+	if ((n=recv(clifd,buf,sizeof(buf),0))<0)	// recv() is called and answer is received from client and stored in buf
+	{
+		err_sys("recv error");			// in case of error displaying error
+		exit(0);
+	}
+
+	printf("%s\n",buf);				// displaying result
+
+
+
+
+
+
+
+	close(clifd);					// closing connection
+
+	return 1;
+}
